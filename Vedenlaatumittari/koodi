@@ -1,0 +1,837 @@
+#include <LiquidCrystal.h>                   //sisällytetään kirjasto LCD-näyttöä varten.
+#include <EEPROM.h>
+#include <GravityTDS.h>
+#include <OneWire.h>                         //kirjasto lämpötila-anturia varten
+#include <DallasTemperature.h>               //kirjasto lämpötila-anturia varten
+#define ONE_WIRE_BUS 13                       // Data wire is conntec to the Arduino digital pin 4
+#define TdsSensorPin A0
+
+OneWire oneWire(ONE_WIRE_BUS);                // Setup a oneWire instance to communicate with any OneWire devices
+DallasTemperature sensors(&oneWire);          // Pass our oneWire reference to Dallas Temperature sensor
+GravityTDS gravityTds;
+
+LiquidCrystal lcd_1(12, 11, 5, 8, 7, 6);      //kerrotaan mihin lcd-näytön mikäkin pinni on kytketty
+int TDS=152, TDSMax=200, TDSMin=40;            //luodaan kokonaislukumuuttujat TDS-arvon tulostusta sekä raja-arvoja varten
+int dist=50, distMax=70, distMin=20;           //luodaan kokonaisluku muuttujat dist-arvon tulostusta sekä raja-arvoja varten
+float duration;                                //luodaan liukuluku muuttujat kaiun kestolle dist-arvon selvittämistä varten 
+float temp=22.0, tempMax=28.0, tempMin=17.0;  //luodaan liukuluku muuttujat dist-arvon tulostusta sekä raja-arvoja varten
+int valikonKohta = 0;                         //luodaan kokonaisluku muuttuja valikonKohta, johon tallennetaan aina sen hetkinen tilanne.
+int dirOfRot=0;                               //luodaan kokonaisluku muuttuja dirOfRot, johon tallennetaan suunta setup-aliohjelmassa 
+
+//encoderin nappi
+int switchPin = 2;                          // Asetetaan enkooderin nappi pinniin 2 (enkooderissa SW)
+int switchState = HIGH;                     // napin arvo aluksi high, kun painetaan -> low
+uint8_t btn_prev;                           // luodaan etumerkitön kokonaislukumuuttuja, johon tallennetaan napin edellinen arvo
+//encoderin pyörintä:
+int pinA = 4;                               // Asetetaan enkooderin toinen arvo pinniin 4 ja sen nimeksi pinA (encooderissa CLK)
+int pinB = 3;                               // Asetetaan enkooderin toinen arvo pinniin 3 ja sen nimeksi pinB (encooderissa DT)
+int pinAstateCurrent = LOW;                 // 
+int pinAStateLast = pinAstateCurrent;       // 
+//Etäisyysmittari
+const int trigPin = 9;
+const int echoPin = 10;
+
+//päivitysviiveen muuttujat
+unsigned long previousMillis = 0;//alustetaan kokonaisluku muuttuja previousMillis
+const long interval = 500; // alustetaan vakio interval 5000ms, eli 5 sekuntia
+bool menuButtonPressed = false;//alustetaan boolean tyyppinen muuttuja menuButtonPressed tilaan false
+
+//Aliohjelmien prototyypit:
+  //Erillaiset näyöttöjen tulostukset:
+void v0 (); 	//perusnäyttö
+		//Valikot:
+void v10 ();	//return	
+void v11 ();	//dist	alerts
+void v110 ();	//return	
+void v111 ();	//dist	Max
+void v1111 ();	//set	
+void v112 ();	//dist	Min
+void v1121 ();	//set	
+void v12 ();	//TDS	alerts
+void v120 ();	//return	
+void v121 ();	//TDS	Max
+void v1211 ();	//set	
+void v122 ();	//TDS	Min
+void v1221 ();	//set	
+void v13 ();	//temp	alerts
+void v130 ();	//return	
+void v131 ();	//temp	Max
+void v1311 ();	//set	
+void v132 ();	//temp	Min
+void v1321 ();	//set	
+void v14 ();	//tallennusnäyttö
+void v141(); 	//tallennus lyhyellä viiveellä
+
+void setup() {
+  pinMode(A4, OUTPUT);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  Serial.begin (9600);  // avataan sarjaporttiyhteys
+ 	lcd_1.begin(16, 2);   // määritellään millainen näyttö on kyseessä
+  gravityTds.setPin(TdsSensorPin);
+  gravityTds.setAref(5.0);  //reference voltage on ADC, default 5.0V on Arduino UNO
+  gravityTds.setAdcRange(1024);  //1024 for 10bit ADC;4096 for 12bit ADC
+  gravityTds.begin();  //initialization
+
+  sensors.begin();   // Start up the library lämpötila-anturille
+//encoderin koodia varten:
+  pinMode (switchPin, INPUT_PULLUP);       // mahdollistaa switchPinin käyttämään Arduinon omaa pullup resistoria
+  btn_prev = digitalRead(switchPin);
+  pinMode (pinA, INPUT);                   // asetetaan pinA inputiksi
+  pinMode (pinB, INPUT);                   // asetetaan pinB inputiksi
+  // Liitetään CHANGE keskeytys pinni B:hen. Suoritetaan update funktio, kun muutos tapahtuu 
+  attachInterrupt(digitalPinToInterrupt(pinB), update, CHANGE); 
+}
+
+void loop() {
+digitalWrite(A4, LOW);//sammutetaan hälyytyksen ledi
+unsigned long currentMillis = millis();//alustetaan kokonaisluku muuttuja currentMillis ja asetetaan sen arvoksi juoksevat millisekunnit.
+uint8_t btn = digitalRead(switchPin);    // Luetaan switchPin, onko nappi painettu vai ei
+if (tempMin>temp||temp>tempMax||distMin>dist||dist>distMax||TDSMin>TDS||TDS>TDSMax){//jos mikään raja-arvo ylittyy tai alittuu, niin
+ digitalWrite(A4, HIGH);//sytytetään hälyytyksen ledi
+}
+
+if(valikonKohta==0){
+      Serial.println("valikonKohta=0");
+      Serial.println(dirOfRot);
+   		btn = digitalRead(switchPin);
+      //Luetaan anturit ja tulostetaan ne näytölle, jos viive-aika on kulunut ja valikonKohta=0
+      	if (currentMillis - previousMillis >= interval) 
+      	{
+      	previousMillis = currentMillis;
+      	v0();
+      	}
+
+	  	if (btn == LOW && btn_prev == HIGH)  
+  		{               
+      	Serial.println("Switch pressed in loop");
+      	valikonKohta=1; 
+              v10();  
+  		}
+      dirOfRot=0;
+	    btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa	
+}
+
+if(valikonKohta==1){//v10 näkymänä
+      while(dirOfRot==0 && !btn == LOW && !btn_prev == HIGH){
+      }  
+      Serial.println("valikonKohta=1");
+  		btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta1");
+      	Serial.println("ValikonKohta=0");
+      	valikonKohta=0;   
+      	}
+      if(dirOfRot==2){
+        valikonKohta=2;
+        v11();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa	
+      dirOfRot=0;
+}
+if(valikonKohta==2){//v11 näkymänä
+      Serial.println("valikonKohta=2");
+      Serial.println(dirOfRot);
+  		btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta2");
+      	Serial.println("ValikonKohta=3");
+      	valikonKohta=3;   
+        v110();
+      	}
+      if(dirOfRot==2){
+        valikonKohta=8;
+        v12();
+      }
+      if(dirOfRot==1){
+        valikonKohta=1;
+        v10();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==3){//v110 näkymänä
+      Serial.println("valikonKohta=3");
+      Serial.println(dirOfRot);
+
+  		btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta3");
+      	Serial.println("ValikonKohta=2");
+      	valikonKohta=2;   
+        v11();
+      	}
+      if(dirOfRot==2){
+        valikonKohta=4;
+        v111();
+      }
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==4){//v111 näkymänä
+      Serial.println("valikonKohta=4");
+      Serial.println(dirOfRot);
+
+  		btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta4");
+      	Serial.println("ValikonKohta=5");
+      	valikonKohta=5;  
+        v1111(); 
+      	}
+      if(dirOfRot==2){
+        valikonKohta=6;
+        v112();
+      }
+      if(dirOfRot==1){
+        valikonKohta=3;
+        v110();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==5){//v1111 näkymänä
+      Serial.println("valikonKohta=5");
+      Serial.println(dirOfRot);
+
+  		btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta5");
+      	Serial.println("ValikonKohta=4");
+        v14(); 
+        valikonKohta=4;
+        v111();
+       	}
+      if(dirOfRot==2){
+      distMax=distMax-5;
+      v1111();
+      }
+      if(dirOfRot==1){
+      distMax=distMax+5;
+      v1111();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==6){//v112 näkymänä
+      Serial.println("valikonKohta=6");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta6");
+      	Serial.println("ValikonKohta=7");
+      	valikonKohta=7;   
+        v1121();
+      	}
+      if(dirOfRot==1){
+        valikonKohta=4;
+        v111();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==7){//v1121 näkymänä
+      Serial.println("valikonKohta=7");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta7");
+      	Serial.println("ValikonKohta=6");
+        v14();
+      	valikonKohta=6;  
+        v112(); 
+      	}
+      if(dirOfRot==2){
+      distMin=distMin-5;
+      v1121();
+      }
+      if(dirOfRot==1){
+      distMin=distMin+5;
+      v1121();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==8){//v12 näkymänä
+      Serial.println("valikonKohta=8");
+      Serial.println(dirOfRot);
+      
+  		btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta8");
+      	Serial.println("ValikonKohta=9");
+      	valikonKohta=9;   
+        v120();
+      	}
+      if(dirOfRot==2){
+        valikonKohta=14;
+        v13();
+      }
+      if(dirOfRot==1){
+        valikonKohta=2;
+        v11();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==9){//v120 näkymänä
+      Serial.println("valikonKohta=9");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta9");
+      	Serial.println("ValikonKohta=8");
+      	valikonKohta=8;   
+        v12();
+      	}
+      if(dirOfRot==2){
+        valikonKohta=10;
+        v121();
+      }
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==10){//v121 näkymänä
+      Serial.println("valikonKohta=10");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta10");
+      	Serial.println("ValikonKohta=11");
+      	valikonKohta=11;
+        v1211();
+      	}
+      if(dirOfRot==2){
+        valikonKohta=12;
+        v122();
+      }
+      if(dirOfRot==1){
+        valikonKohta=9;
+        v120();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==11){//v1211 näkymänä
+      Serial.println("valikonKohta=11");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta11");
+      	Serial.println("ValikonKohta=10");
+        v14(); 
+        valikonKohta=10;
+        v121();
+       	}
+      if(dirOfRot==2){
+      TDSMax=TDSMax-10;
+      v1211();
+      }
+      if(dirOfRot==1){
+      TDSMax=TDSMax+10; 
+      v1211();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==12){//v122 näkymänä
+      Serial.println("valikonKohta=12");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta12");
+      	Serial.println("ValikonKohta=13");
+      	valikonKohta=13;   
+        v1221();
+      	}
+      if(dirOfRot==1){
+        valikonKohta=10;
+        v121();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==13){//v1221 näkymänä
+      Serial.println("valikonKohta=13");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta13");
+      	Serial.println("ValikonKohta=12");
+      	v14();
+        valikonKohta=12;  
+        v122(); 
+      	}
+      if(dirOfRot==2){
+      TDSMin=TDSMin-10; 
+      v1221();
+      }
+      if(dirOfRot==1){
+      TDSMin=TDSMin+10; 
+      v1221();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==14){//v13 näkymänä
+      Serial.println("valikonKohta=14");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta14");
+      	Serial.println("ValikonKohta=15");
+      	valikonKohta=15;   
+        v130();
+      	}
+      if(dirOfRot==1){
+        valikonKohta=8;
+        v12();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==15){//v130 näkymänä
+      Serial.println("valikonKohta=15");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta15");
+      	Serial.println("ValikonKohta=14");
+      	valikonKohta=14; 
+        v13();  
+      	}
+      if(dirOfRot==2){
+        valikonKohta=16;
+        v131();
+      }
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==16){//v131 näkymänä
+      Serial.println("valikonKohta=16");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta16");
+      	Serial.println("ValikonKohta=17");
+      	valikonKohta=17;   
+        v1311();
+      	}
+      if(dirOfRot==2){
+        valikonKohta=18;
+        v132();
+      }
+      if(dirOfRot==1){
+        valikonKohta=15;
+        v130();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==17){//v1311 näkymänä
+      Serial.println("valikonKohta=17");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta17");
+      	Serial.println("ValikonKohta=3");
+        v14();
+      	valikonKohta=16;   
+        v131();
+      	}
+      if(dirOfRot==2){
+      tempMax=tempMax-1; 
+      v1311();
+      }
+      if(dirOfRot==1){
+      tempMax=tempMax+1; 
+      v1311();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==18){//v132 näkymänä
+      Serial.println("valikonKohta=18");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta 18");
+      	Serial.println("ValikonKohta=19");
+      	valikonKohta=19;  
+        v1321(); 
+      	}
+      if(dirOfRot==1){
+        valikonKohta=16;
+        v131();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+if(valikonKohta==19){//v1321 näkymänä
+      Serial.println("valikonKohta=19");
+      Serial.println(dirOfRot);
+      btn = digitalRead(switchPin);
+      if (btn == LOW && btn_prev == HIGH)  
+        {               
+      	Serial.println("Switch pressed in valikonKohta19");
+      	Serial.println("ValikonKohta=3");
+        v14();
+      	valikonKohta=18;   
+        v132();
+      	}
+      if(dirOfRot==2){
+        tempMin=tempMin-1; 
+        v1321();
+      }
+      if(dirOfRot==1){
+        tempMin=tempMin+1; 
+        v1321();
+      }  
+   	  btn_prev = digitalRead(switchPin); //jos nappia ei ole painettu asetetaan btn_prev arvoksi napin nykyinen arvo ja pyöritään loopissa
+      dirOfRot=0; 	
+}      
+}
+
+
+//Aliohjelmat:
+void update() {
+  // PYÖRITYSSUUNTA
+  pinAStateLast = pinAstateCurrent;        // Store the latest read value in the currect state variable
+  pinAstateCurrent = digitalRead(pinA);    // Luetaan pinA ja tallenta se currentStatena
+  // Jos oli liikettä, halutaan olla varmoja, että se teki yhden stepin muutoksen
+  if ((pinAStateLast == LOW) && (pinAstateCurrent == HIGH)) 
+  {  
+    if (digitalRead(pinB) == HIGH) {      // If Pin B is HIGH
+      Serial.println("Counter Clockwise");             // Print on screen
+      dirOfRot=2;
+    } 
+    else 
+    {
+      Serial.println("Clockwise");            // Print on screen
+      dirOfRot=1;
+    }
+  }
+else{
+  pinAStateLast = pinAstateCurrent;        // Store the latest read value in the currect state variable
+  dirOfRot=0;
+}
+}
+
+void v0 () //aloitusnäyttö
+{
+//Luetaan anturit:
+  //etäisyys:
+digitalWrite(trigPin, LOW);         //Tämä koodi oli valmiina anturille esimerkissä
+delayMicroseconds(2);               //Tämä koodi oli valmiina anturille esimerkissä
+digitalWrite(trigPin, HIGH);        //Tämä koodi oli valmiina anturille esimerkissä
+delayMicroseconds(10);              //Tämä koodi oli valmiina anturille esimerkissä
+digitalWrite(trigPin, LOW);         //Tämä koodi oli valmiina anturille esimerkissä
+duration = pulseIn(echoPin, HIGH);  //Tämä koodi oli valmiina anturille esimerkissä
+dist = (duration*.0343)/2*10;       //Tämä koodi oli valmiina anturille esimerkissä, tähän kuitenkin muutettiin koodia niin, että tallennetaan arvo millimetreinä, kun se oli esimerkissä senttimetreinä
+
+//Lämpötila
+// Call sensors.requestTemperatures() to issue a global temperature and Requests to all devices on the bus
+sensors.requestTemperatures(); 
+// Why "byIndex"? You can have more than one IC on the same bus. 0 refers to the first IC on the wire
+temp=(sensors.getTempCByIndex(0)); 
+
+//TDS
+    sensors.requestTemperatures();
+    gravityTds.setTemperature(sensors.getTempCByIndex(0));  // set the temperature and execute temperature compensation
+    gravityTds.update();  //sample and calculate
+    TDS = gravityTds.getTdsValue();  // then get the value
+
+//näytön tulostus
+lcd_1.clear();//tyhjentää näytön
+lcd_1.noBlink();//asettaa kursorin vilkkumattomaksi
+//tulostetaan 1. rivi
+lcd_1.print("Dist TDS  Temp.C"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville, jotta voidaan tulostaa 2. rivi
+//tulostetaan 2. rivi
+lcd_1.print(dist);//tulostetaan dist arvo
+lcd_1.setCursor(5, 1); //asetetaan kursori näytöllä TDS:n sijaintiin
+lcd_1.print(TDS);//tulostetaan TDS:n arvo
+lcd_1.setCursor(11, 1); //asetetaan kursori näytöllä Lämpötilan sijaintiin
+lcd_1.print(temp,1);//tulostetaan lämpötilan arvo
+
+//Hälyytykset:
+if (distMin>dist||dist>distMax){
+lcd_1.setCursor(4,1); //asetetaan kursori näytöllä dist-arvon perään
+lcd_1.print("!");//tulostetaan huutomerkki dist-arvon perään
+}
+
+if (TDSMin>TDS||TDS>TDSMax){
+lcd_1.setCursor(8,1); //asetetaan kursori näytöllä TDS-arvon perään
+lcd_1.print("!");//tulostetaan huutomerkki TDS-arvon perään
+}
+
+if (tempMin>temp||temp>tempMax){
+lcd_1.setCursor(15,1); //asetetaan kursori näytöllä temp-arvon perään
+lcd_1.print("!");//tulostetaan huutomerkki temp-arvon perään
+}
+
+
+}
+
+void v10 ()//return	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Return"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville, jotta voidaan tulostaa sinne
+lcd_1.print("dist alerts");//tulostetaan 
+lcd_1.setCursor(0, 0); //asetetaan kursori näytöllä ensimmäiselle riville
+}	
+
+void v11 ()//dist	alerts
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Return"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville, jotta voidaan tulostaa sinne
+lcd_1.print("dist alerts");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+}	
+
+void v110 ()//return	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Return"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("dist Max");//tulostetaan 
+lcd_1.setCursor(0, 0); //asetetaan kursori näytöllä ensimmäiselle riville
+}	
+
+void v111 ()//dist	Max
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Return"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("dist Max");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+}	
+
+void v1111 ()//set	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("dist Max = "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(9, 0); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(distMax); //tulostetaan nykyinen distMax arvo.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("set: ");//tulostetaan 
+lcd_1.setCursor(5, 1); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(distMax); //tulostetaan nykyinen distMax arvo.
+}	
+
+void v112 ()//dist	Min
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("dist Max"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("dist Min");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+}	
+
+void v1121 ()//set	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("dist Min = "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(9, 0); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(distMin); //tulostetaan nykyinen distMax arvo.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("set: ");//tulostetaan 
+lcd_1.setCursor(5, 1); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(distMin); //tulostetaan nykyinen distMax arvo.
+}	
+
+void v12 ()//TDS	alerts
+{
+lcd_1.clear();//tyhjentää näytön	
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.setCursor(0, 0); //asetetaan kursori näytöllä toiselle riville, jotta voidaan tulostaa sinne
+lcd_1.print("TDS alerts");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä ensimmäiselle riville
+lcd_1.print("temp alerts");//tulostetaan 
+lcd_1.setCursor(0, 0); //asetetaan kursori näytöllä ensimmäiselle riville
+}	
+
+void v120 ()//return	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Return"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("TDS Max");//tulostetaan 
+lcd_1.setCursor(0, 0); //asetetaan kursori näytöllä ensimmäiselle riville
+}	
+
+void v121 ()//TDS	Max
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Return"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("TDS Max");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+}	
+
+void v1211 ()//set	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("TDS Max = "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(10, 0); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(TDSMax); //tulostetaan nykyinen TDSMax arvo.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("set: ");//tulostetaan 
+lcd_1.setCursor(5, 1); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(TDSMax); //tulostetaan nykyinen TDSMax arvo.
+}	
+
+void v122 ()//TDS	Min
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("TDS Max"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("TDS Min");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+}	
+
+void v1221 ()//set	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("TDS Min = "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(10, 0); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(TDSMin); //tulostetaan nykyinen TDSMin arvo.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("set: ");//tulostetaan 
+lcd_1.setCursor(5, 1); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(TDSMin); //tulostetaan nykyinen TDSMin arvo.
+}	
+
+void v13 ()//temp	alerts
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.setCursor(0, 0); //asetetaan kursori näytöllä ensimmäiselle riville, jotta voidaan tulostaa sinne
+lcd_1.print("TDS alerts");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("temp alerts");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+}	
+
+void v130 ()//return	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Return"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("Temp Max");//tulostetaan 
+lcd_1.setCursor(0, 0); //asetetaan kursori näytöllä ensimmäiselle riville
+}	
+
+void v131 ()//temp	Max
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Return"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("Temp Max");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+}	
+
+void v1311 ()//set	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Temp Max = "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(11, 0); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(tempMax); //tulostetaan nykyinen tempMax arvo.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("set: ");//tulostetaan 
+lcd_1.setCursor(5, 1); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(tempMax); //tulostetaan nykyinen tempMax arvo.
+}	
+
+void v132 ()//temp	Min
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Temp Max"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("Temp Min");//tulostetaan 
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+}	
+
+void v1321 ()//set	
+{
+lcd_1.clear();//tyhjentää näytön
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Temp Min = "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+lcd_1.setCursor(11, 0); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(tempMin); //tulostetaan nykyinen tempMin arvo.
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä toiselle riville
+lcd_1.print("set: ");//tulostetaan 
+lcd_1.setCursor(5, 1); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print(tempMin); //tulostetaan nykyinen tempMin arvo.
+lcd_1.setCursor(8, 1); //asetetaan kursori näytöllä edellisen tulostuksen perään (kymmenysosien kohdalle)
+}	
+
+void v14 ()//tallennusnäyttö
+{
+lcd_1.clear();//tyhjennetään näyttö
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Saving data..."); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(2000);     //odotetaan hetki
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print("3 "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(2000);     //odotetaan hetki
+lcd_1.print("2 "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(1750);     //odotetaan hetki
+lcd_1.print("1 "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(1500);     //odotetaan hetki
+lcd_1.print("done!"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(2000);     //odotetaan hetki
+}
+
+void v141 ()//tallennusnäyttö lyhyemmillä tauoilla
+{
+lcd_1.clear();//tyhjennetään näyttö
+lcd_1.blink(); //asetetaan kursori vilkkumaan
+lcd_1.print("Saving data..."); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(500);     //odotetaan hetki
+lcd_1.setCursor(0, 1); //asetetaan kursori näytöllä edellisen tekstin perään
+lcd_1.print("3 "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(500);     //odotetaan hetki
+lcd_1.print("2 "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(500);     //odotetaan hetki
+lcd_1.print("1 "); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(500);     //odotetaan hetki
+lcd_1.print("done!"); //kirjoitetaan ekasta merkitä lähtien näytölle.
+delay(500);     //odotetaan hetki
+}
