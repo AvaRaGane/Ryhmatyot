@@ -3,7 +3,7 @@ Täältä löytyy ryhmätyöt, joita olen ollut tekemässä kouluni aikana.
 
 Kevät 2023 Vedenlaatumittari
 	Mittarilla mitataan akvaarioveden lämpötilaa, likaisuutta ja määrää.
- 	Projekti tehtiin arduino-Unolle.\n\n
+ 	Projekti tehtiin arduino-Unolle.
 
   
   Syksy 2023 Pankkiautomaatti
