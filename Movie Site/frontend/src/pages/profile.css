@@ -1,0 +1,314 @@
+.profile-container {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 20%;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10%;
+    font-family: "Raleway", sans-serif;
+}
+
+.profile-info {
+    display: flex;
+    margin: 1%;
+    padding: 2%;
+    width: 80%;
+    background-color: rgba(37, 37, 37, 0.5);
+}
+
+.profile-pic {
+    flex: 30%;
+    border-right: solid 1px white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.profile-photo{
+    width: 50%;
+    border-radius: 50%;
+}
+
+.photo-add {
+    color: turquoise;
+    font-size: 100%;
+    padding: 5%;
+    position: absolute;
+    bottom: 0;
+    right: 10%;
+}
+
+.profile-input:focus {
+    outline: none;
+}
+
+.profile-text {
+    flex: 60%;
+    padding-left: 5%;
+    color: white;
+    position: relative;
+}
+
+.profile-buttons{
+    position: absolute;
+    bottom: 0;
+    margin-bottom: 20px;
+    right: 0%;
+    display: inline-block;
+}
+
+.change-password {
+    margin-right: 10px; /* Lisää tilaa alapuolelle */
+  }
+  
+  .delete-user {
+    background-color: brown;
+  }
+
+.change-password-form{
+    display: flex;
+    flex-direction: column;
+}
+
+label{
+    margin-top: 2%;
+    padding: 1%;
+}
+
+input{
+    padding: 1%;
+    margin-bottom: 1%;
+}
+
+
+.profile-favorite{
+    min-width: 80%;
+    width: 80%;
+    background-color: rgba(37, 37, 37, 0.5);
+    color: aliceblue;
+    padding: 2%;
+    margin: 1%;
+    text-align: center;
+}
+
+.profile-favorite-items{
+    display: flex;
+    margin-top: 2%;
+
+}
+
+.profile-favorite-items .favourite-card-item {
+    width: 100%; /* Ensure full width for single favourite */
+}
+
+.profile-favourite-picture{
+    max-width: 100%; /* Ensures the image does not exceed its container width */
+    height: 400px;
+    padding: 2%;
+}
+
+
+
+.profile-favourite-title{
+    padding-top: 5%;
+}
+
+.profile-group-container{
+    display: flex;
+    width: 80%;
+    margin: 1%;
+    padding: 1%;
+    color: aliceblue;
+}
+
+.profile-group-name{
+    font-size: 200%;
+    font-family: "Poiret One", sans-serif;
+}
+
+.profile-group {
+    flex: 50%;
+    background-color: rgba(37, 37, 37, 0.5);
+    margin: 2%;
+    padding: 2%;
+    margin-bottom: 10%;
+}
+
+.profile-group-list{
+    list-style: none;
+    padding: 2%;
+    text-align: center;
+    font-size: 110%;
+}
+
+.profile-group-list-item{
+    padding: 2%;
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-invites{
+    background-color: rgba(37, 37, 37, 0.5);
+    padding: 2%;
+    text-align: center;
+    flex: 50%;
+    margin: 2%;
+    margin-bottom: 10%;
+}
+
+.centered-button-container {
+    display: flex;
+    justify-content: center;
+  }
+
+.profile-group-button{
+    margin: 2%;
+}
+
+.profile-image-container {
+    position: relative;
+  }
+  
+  .invite-count {
+    position: absolute;
+    top: -10px; /* Adjust position */
+    right: -10px; /* Adjust position */
+    background-color: red;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+}
+
+.seeinvites-container{
+    margin: 2%; 
+    padding: 1%; 
+    background: lightgray; 
+    border-radius: 15px; 
+    color: black; 
+}
+
+.seeinvites-button{
+    margin-right: 5%;
+}
+  
+
+@media (max-width: 800px){
+    
+    .profile-text{
+        font-size: 70%;
+    }
+        
+    .profile-favourite-title{
+        font-size: 80%;
+    }
+    
+    .profile-group-container{
+        width: 85%;
+    }
+    
+    .profile-group-name{
+        font-size: 100%;
+    }
+    
+    .centered-button-container {
+        display: flex;
+        justify-content: center;
+    }
+
+
+    .profile-favourite-picture{
+        max-width: 100%; /* Ensures the image does not exceed its container width */
+        height: 180px;
+    }
+
+    .profile-favorite-items .favourite-card-item {
+        width: calc(100% / 3);
+    }
+
+    .profile-favourite-title{
+        font-size: 60%;
+    }
+    
+    .profile-group-button{
+        width: 80%;
+    }
+    
+    .profile-group-list-item{
+        width: 100%;
+        font-size: 70%;
+    }
+
+    .seeinvites-container p{
+      font-size: 60%;
+    }
+    
+    .seeinvites-button{
+        font-size: 70%;
+    }
+       
+}
+
+@media (max-width: 400px){
+
+    .profile-container {
+        top: 10%;
+    }
+
+    .profile-photo{
+        width: 60%;
+        border-radius: 50%;
+    }
+
+    .photo-add {
+        font-size: 50%;
+        padding: 5%;
+        bottom: 10%;
+    }
+    
+    .profile-text{
+        font-size: 40%;
+    }
+
+    .profile-buttons{
+        bottom: -20%;
+    }
+        
+    .profile-favourite-title{
+        font-size: 50%;
+    }
+    
+    .profile-group-container{
+        width: 90%;
+    }
+    
+    .profile-group-name{
+        font-size: 60%;
+    }
+        
+    .profile-group-button{
+        width: 70%;
+        font-size: 60%;
+    }
+    
+    .profile-group-list-item{
+        width: 100%;
+        font-size: 50%;
+    }
+
+    .seeinvites-container p{
+      font-size: 50%;
+    }
+    
+    .seeinvites-button{
+        font-size: 40%;
+    }
+       
+}

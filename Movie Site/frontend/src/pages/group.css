@@ -1,0 +1,187 @@
+.group-container {
+    position: absolute;
+    top: 20%;
+    margin: 2%;
+    
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 2%;
+}
+
+.groups-container {
+    display: flex;
+    margin-bottom: 5%;
+}
+
+.allGroups {
+    flex: 9;
+    margin-right: 10px;
+}
+
+.group-card {
+    display: flex;
+    flex-wrap: wrap;
+   
+}
+
+.group-card > * {
+    flex: 0 0 calc(30%); 
+    margin: 1%; 
+}
+
+.group-card-item{
+    background-color: #333333;
+    padding: 4%;
+    color: aliceblue;
+    border-radius: 50px;
+}
+
+
+.allGroups a {
+    text-decoration: none;
+    color: white;
+    margin: 5px;
+    background-color: #333333;
+    padding: 32px;
+    display: block;
+}
+
+.allGroups a:hover {
+    box-shadow: inset 50em 0 0 0 rgba(37, 37, 37, 0.5);
+}
+
+  .link-style{
+    background-color: transparent;
+  }
+
+
+.createGroup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 2%;
+    margin-right: 5%;
+    flex: 3;
+}
+
+
+.create-group-button {
+    height: 50px;
+    width: 50%;
+    padding: 0 4%;
+    margin: 2%;
+    text-align: center;
+}
+
+
+.group-name{
+    font-size: 150%;
+    font-weight: bold;
+    font-family: "Poiret One", sans-serif;
+}
+
+.group-card .description {
+        width: 100%;
+}
+
+  
+.show-group-info-button {
+    display: inline-block;
+    padding: 5px 10px; /* Adjust padding to change button size */
+    background-color: white; /* White background color */
+    border: 2px solid #333; /* Dark gray border */
+    border-radius: 10px; /* Adjust border radius for rounded corners */
+    color: #333; /* Dark gray text color */
+    font-size: 80%; /* Adjust font size as needed */
+    cursor: pointer;
+    width: 100%;
+    margin-top: 5%;
+    margin-bottom: -10%;
+  }
+
+  .show-group-info-button:hover {
+    border: 2px solid white;
+    color: #fff; /* White text color on hover */
+    background-color: #333; /* Dark gray background color on hover */
+  }
+
+  .popup-inner{
+    background-color: #fff;
+    margin: 2%;
+    padding: 5%;
+    border-radius: 15px;
+  }
+
+  .close-btn{
+    padding: 0.5% 2%;
+    margin-left: 90%;
+  }
+
+
+  @media (max-width: 800px){
+
+    h1{
+        font-size: 100%;
+    }
+
+    .group-container {
+        top: 10%;   
+    }
+    
+    .group-card-item{
+        padding: 5%;
+        border-radius: 15px;
+        font-size: 50%;
+    }
+    
+    .createGroup {
+        flex: 3;
+        font-size: 60%;
+        padding: 2%;
+    }
+
+    .create-group-button{
+        font-size: 90%;
+    }
+   
+    .group-name{
+        font-size: 120%;
+    }
+         
+    .show-group-info-button {
+        font-size: 80%; /* Adjust font size as needed */
+      }
+ 
+  }
+
+  @media (max-width: 400px){
+    .group-container {
+        top: 10%;   
+    }
+    
+    .group-card-item{
+        padding: 5%;
+        border-radius: 15px;
+        font-size: 25%;
+    }
+    
+    .createGroup {
+        flex: 2;
+        font-size: 50%;
+    }
+
+    .create-group-button{
+        font-size: 80%;
+    }
+   
+    .group-name{
+        font-size: 120%;
+    }
+         
+    .show-group-info-button {
+        font-size: 80%; /* Adjust font size as needed */
+      }
+ 
+  }
